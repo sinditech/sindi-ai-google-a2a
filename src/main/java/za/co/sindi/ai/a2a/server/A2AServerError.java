@@ -29,4 +29,11 @@ public class A2AServerError extends RuntimeException {
 		// TODO Auto-generated method stub
 		return ((JSONRPCError)error).getMessage();
 	}
+
+	/**
+	 * @return the error
+	 */
+	public A2AError getError() {
+		return error;
+	}
 }
