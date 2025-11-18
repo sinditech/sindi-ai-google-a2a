@@ -12,7 +12,7 @@ import java.util.UUID;
 @FunctionalInterface
 public interface IDGenerator {
 	
-	public static final IDGenerator DEFAULT = (context) -> UUID.randomUUID().toString(); 
+	public static final IDGenerator DEFAULT = (_) -> UUID.randomUUID().toString(); 
 
 	public String generateId(final IDGeneratorContext context);
 }

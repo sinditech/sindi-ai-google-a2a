@@ -30,5 +30,4 @@ public final class DeleteTaskPushNotificationConfigSuccessResponse extends JSONR
 	public DeleteTaskPushNotificationConfigSuccessResponse(RequestId id) {
 		this(JSONRPCVersion.getLatest(), id);
 	}
-
 }

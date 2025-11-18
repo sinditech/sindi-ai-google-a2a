@@ -14,7 +14,7 @@ public final class APIKeySecurityScheme extends SecurityScheme {
 
 	public static final String TYPE = "apiKey";
 	
-	private Location in;
+	private In in;
 	private String name;
 	
 	/**
@@ -23,7 +23,7 @@ public final class APIKeySecurityScheme extends SecurityScheme {
 	 * @param name
 	 */
 	@JsonbCreator
-	public APIKeySecurityScheme(@JsonbProperty String description, @JsonbProperty Location in, @JsonbProperty String name) {
+	public APIKeySecurityScheme(@JsonbProperty String description, @JsonbProperty In in, @JsonbProperty String name) {
 		super();
 		setDescription(description);
 		this.in = in;
@@ -33,7 +33,7 @@ public final class APIKeySecurityScheme extends SecurityScheme {
 	/**
 	 * @return the in
 	 */
-	public Location getIn() {
+	public In getIn() {
 		return in;
 	}
 
@@ -44,7 +44,7 @@ public final class APIKeySecurityScheme extends SecurityScheme {
 		return name;
 	}
 
-	public static enum Location {
+	public static enum In {
 		JSONRPC("JSONRPC"), // JSON-RPC 2.0 over HTTP (mandatory)
 		GRPC("GRPC"), // gRPC over HTTP/2 (optional)
 		HTTP_JSON("HTTP+JSON"),
@@ -54,7 +54,7 @@ public final class APIKeySecurityScheme extends SecurityScheme {
 		/**
 		 * @param location
 		 */
-		private Location(String location) {
+		private In(String location) {
 			this.location = location;
 		}
 
@@ -64,8 +64,8 @@ public final class APIKeySecurityScheme extends SecurityScheme {
 			return location;
 		}
 		
-		public static Location of(final String value) {
-			for (Location location : values()) {
+		public static In of(final String value) {
+			for (In location : values()) {
 				if (location.location.equals(value)) return location;
 			}
 			

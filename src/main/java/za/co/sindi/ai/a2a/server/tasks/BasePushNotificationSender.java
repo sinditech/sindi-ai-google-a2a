@@ -66,11 +66,11 @@ public class BasePushNotificationSender implements PushNotificationSender {
 		
         try {
 			if (!allResults.get()) {
-				LOGGER.warning(String.format("Some push notifications failed to send for task_id=%s", task.getId()));
+				LOGGER.warning(String.format("Some push notifications failed to send for taskId=%s", task.getId()));
 			}
 		} catch (InterruptedException | ExecutionException e) {
 			// TODO Auto-generated catch block
-			LOGGER.log(Level.WARNING, String.format("Some push notifications failed to send for task_id=%s", task.getId()), e);
+			LOGGER.log(Level.WARNING, String.format("Some push notifications failed to send for taskId=%s", task.getId()), e);
 		}
 	}
 	
@@ -92,10 +92,10 @@ public class BasePushNotificationSender implements PushNotificationSender {
 			
 			HttpResponse<String> response = httpClient.send(httpRequestBuilder.build(), BodyHandlers.ofString());
 			raiseExceptionsIfAny(response);
-			LOGGER.info(String.format("Push-notification sent for task_id=%s to URL: %s.", task.getId(), pushInfo.url()));
+			LOGGER.info(String.format("Push-notification sent for taskId=%s to URL: %s.", task.getId(), pushInfo.url()));
 		} catch (IOException | InterruptedException e) {
 			// TODO Auto-generated catch block
-			LOGGER.severe(String.format("Error sending push-notification for task_id=%s to URL: %s.", task.getId(), pushInfo.url()));
+			LOGGER.severe(String.format("Error sending push-notification for taskId=%s to URL: %s.", task.getId(), pushInfo.url()));
 			return false;
 		}
 		
@@ -106,7 +106,7 @@ public class BasePushNotificationSender implements PushNotificationSender {
 		int code = httpResponse.statusCode() / 100;
 		if (code == 4 || code == 5) {
 			String content = httpResponse.body();
-			String contentType = httpResponse.headers().firstValue("content-type").orElse(null);
+			String contentType = httpResponse.headers().firstValue("Content-Type").orElse(null);
 			if (!Strings.isNullOrEmpty(contentType) && contentType.startsWith("application/json")) {
 				throw new A2AClientJSONRPCError(JsonUtils.unmarshall(content, JSONRPCErrorResponse.class));
 			} else throw new IOException("HTTP status " + httpResponse.statusCode() + ": " + content);

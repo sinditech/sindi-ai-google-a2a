@@ -21,4 +21,8 @@ public record GetTaskPushNotificationConfigParams(@JsonbProperty String id, @Jso
 	public GetTaskPushNotificationConfigParams(String id) {
 		this(id, null, null);
 	}
+	
+	public GetTaskPushNotificationConfigParams(String id, String pushNotificationConfigId) {
+		this(id, null, pushNotificationConfigId);
+	}
 }

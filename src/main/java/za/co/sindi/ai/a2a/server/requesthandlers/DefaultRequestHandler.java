@@ -85,7 +85,7 @@ public class DefaultRequestHandler implements RequestHandler {
 	 * Initializes the DefaultRequestHandler.
 	 * 
 	 * @param agentExecutor The {@link AgentExecutor} instance to run agent logic.
-	 * @param taskStore  The {@link TaskStore} instance to manage task persistence.
+	 * @param taskStore The {@link TaskStore} instance to manage task persistence.
 	 * @param executor
 	 */
 	public DefaultRequestHandler(AgentExecutor agentExecutor, TaskStore taskStore, Executor executor) {
@@ -229,6 +229,8 @@ public class DefaultRequestHandler implements RequestHandler {
 				
 				sendPushNotificationIfNeeded(execution.taskId(), execution.resultAggregator());
 			}));
+			
+			return results;
 		} finally {
 			FutureTaskWithDoneCallbacks<Void> cleanupTask = new FutureTaskWithDoneCallbacks<>(() -> {
 				cleanupProducer(execution.taskId(), execution.producerTask());
@@ -237,8 +239,6 @@ public class DefaultRequestHandler implements RequestHandler {
 			cleanupTask.setName("cleanup_producer:" + execution.taskId());
 			trackBackgroundTask(cleanupTask);
 		}
-		
-		return null;
 	}
 	
 	private void validateTaskIdMatch(final String taskId, final String eventTaskId) {
@@ -344,7 +344,7 @@ public class DefaultRequestHandler implements RequestHandler {
 	 */
 	private void cleanupProducer(final String taskId, final FutureTask<Void> producerTask) {
 		
-		CompletableFuture.runAsync(producerTask, executor).whenComplete((__, throwable) -> { 
+		CompletableFuture.runAsync(producerTask, executor).whenComplete((_, _) -> { 
 			queueManager.close(taskId);
 			runningAgents.remove(taskId);
 		});

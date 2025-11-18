@@ -8,7 +8,6 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.Flow;
 import java.util.concurrent.Flow.Publisher;
 import java.util.concurrent.Flow.Subscriber;
-import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
@@ -20,7 +19,6 @@ import za.co.sindi.ai.a2a.types.Event;
 import za.co.sindi.ai.a2a.types.Message;
 import za.co.sindi.ai.a2a.types.Task;
 import za.co.sindi.ai.a2a.types.TaskStatusUpdateEvent;
-import za.co.sindi.commons.utils.Throwables;
 
 /**
  * @author Buhake Sindi
