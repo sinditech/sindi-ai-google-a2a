@@ -48,6 +48,6 @@ public class InMemoryContextCredentialStore implements CredentialService {
 	 * @param credential The credential string
 	 */
 	public void setCredentials(final String sessionId, final String securitySchemeName, final String credential) {
-		store.computeIfAbsent(sessionId, k -> new ConcurrentHashMap<>()).put(securitySchemeName, credential);
+		store.computeIfAbsent(sessionId, _ -> new ConcurrentHashMap<>()).put(securitySchemeName, credential);
 	}
 }

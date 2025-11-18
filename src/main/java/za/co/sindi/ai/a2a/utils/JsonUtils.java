@@ -5,6 +5,7 @@ package za.co.sindi.ai.a2a.utils;
 
 import jakarta.json.bind.JsonbBuilder;
 import jakarta.json.bind.JsonbConfig;
+import za.co.sindi.ai.a2a.utils.json.JsonAPISchemeInAdapter;
 import za.co.sindi.ai.a2a.utils.json.JsonJSONRPCVersionAdapter;
 import za.co.sindi.ai.a2a.utils.json.JsonMessageRoleAdapter;
 import za.co.sindi.ai.a2a.utils.json.JsonTaskStateAdapter;
@@ -21,7 +22,8 @@ public final class JsonUtils {
 	}
 	
 	private static void registerConfig(final JsonbConfig config) {
-		config.withAdapters(new JsonJSONRPCVersionAdapter(),
+		config.withAdapters(new JsonAPISchemeInAdapter(),
+				new JsonJSONRPCVersionAdapter(),
 				new JsonMessageRoleAdapter(),
 				new JsonTaskStateAdapter(),
 				new JsonTransportProtocolAdapter());

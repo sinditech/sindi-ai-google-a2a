@@ -21,4 +21,8 @@ public record DeleteTaskPushNotificationConfigParams(@JsonbProperty String id, @
 	public DeleteTaskPushNotificationConfigParams(String id) {
 		this(id, null, null);
 	}
+	
+	public DeleteTaskPushNotificationConfigParams(String id, String pushNotificationConfigId) {
+		this(id, null, pushNotificationConfigId);
+	}
 }
