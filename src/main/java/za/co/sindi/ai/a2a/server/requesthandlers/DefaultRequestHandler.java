@@ -15,6 +15,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Flow.Publisher;
 import java.util.concurrent.FutureTask;
 import java.util.function.Consumer;
@@ -79,7 +80,17 @@ public class DefaultRequestHandler implements RequestHandler {
 	private final RequestContextBuilder requestContextBuilder;
 	private final Map<String, FutureTask<Void>> runningAgents;
 	private final Set<FutureTask<Void>> backgroundTasks;
-	private final Executor executor;
+	private Executor executor;
+	
+	/**
+	 * Initializes the DefaultRequestHandler.
+	 * 
+	 * @param agentExecutor The {@link AgentExecutor} instance to run agent logic.
+	 * @param taskStore The {@link TaskStore} instance to manage task persistence.
+	 */
+	public DefaultRequestHandler(AgentExecutor agentExecutor, TaskStore taskStore) {
+		this(agentExecutor, taskStore, null, null, null, null, Executors.newVirtualThreadPerTaskExecutor());
+	}
 	
 	/**
 	 * Initializes the DefaultRequestHandler.
@@ -90,6 +101,22 @@ public class DefaultRequestHandler implements RequestHandler {
 	 */
 	public DefaultRequestHandler(AgentExecutor agentExecutor, TaskStore taskStore, Executor executor) {
 		this(agentExecutor, taskStore, null, null, null, null, executor);
+	}
+	
+	/**
+	 * Initializes the DefaultRequestHandler.
+	 * 
+	 * @param agentExecutor The {@link AgentExecutor} instance to run agent logic.
+	 * @param taskStore  The {@link TaskStore} instance to manage task persistence.
+	 * @param queueManager The {@link QueueManager} instance to manage event queues. Defaults to {@link InMemoryQueueManager}.
+	 * @param pushConfigStore The {@link PushNotificationConfigStore} instance for managing push notification configurations. Defaults to <code>null</code>.
+	 * @param pushSender The {@link PushNotificationSender} instance for sending push notifications. Defaults to <code>null</code>.
+	 * @param requestContextBuilder The {@link RequestContextBuilder} instance used to build request contexts. Defaults to {@link SimpleRequestContextBuilder}.
+	 */
+	public DefaultRequestHandler(AgentExecutor agentExecutor, TaskStore taskStore, QueueManager queueManager,
+			PushNotificationConfigStore pushConfigStore, PushNotificationSender pushSender,
+			RequestContextBuilder requestContextBuilder) {
+		this(agentExecutor, taskStore, queueManager, pushConfigStore, pushSender, requestContextBuilder, Executors.newVirtualThreadPerTaskExecutor());
 	}
 
 	/**
