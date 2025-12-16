@@ -400,7 +400,7 @@ public class DefaultRequestHandler implements RequestHandler {
 					LOGGER.severe(String.format("Background task %s failed", name));
 				}
 			} finally {
-				backgroundTasks.add(_task);
+				backgroundTasks.remove(_task);
 			}
 		});
 	}
