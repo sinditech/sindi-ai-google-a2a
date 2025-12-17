@@ -14,7 +14,7 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Flow.Publisher;
 import java.util.concurrent.FutureTask;
@@ -55,6 +55,7 @@ import za.co.sindi.ai.a2a.types.TaskQueryParams;
 import za.co.sindi.ai.a2a.types.TaskState;
 import za.co.sindi.ai.a2a.types.UnsupportedOperationError;
 import za.co.sindi.ai.a2a.utils.Tasks;
+import za.co.sindi.commons.concurrent.CancellablePublisher;
 import za.co.sindi.commons.concurrent.ConsumingSubscriber;
 
 /**
@@ -80,7 +81,7 @@ public class DefaultRequestHandler implements RequestHandler {
 	private final RequestContextBuilder requestContextBuilder;
 	private final Map<String, FutureTask<Void>> runningAgents;
 	private final Set<FutureTask<Void>> backgroundTasks;
-	private Executor executor;
+	private ExecutorService executor;
 	
 	/**
 	 * Initializes the DefaultRequestHandler.
@@ -99,7 +100,7 @@ public class DefaultRequestHandler implements RequestHandler {
 	 * @param taskStore The {@link TaskStore} instance to manage task persistence.
 	 * @param executor
 	 */
-	public DefaultRequestHandler(AgentExecutor agentExecutor, TaskStore taskStore, Executor executor) {
+	public DefaultRequestHandler(AgentExecutor agentExecutor, TaskStore taskStore, ExecutorService executor) {
 		this(agentExecutor, taskStore, null, null, null, null, executor);
 	}
 	
@@ -132,7 +133,7 @@ public class DefaultRequestHandler implements RequestHandler {
 	 */
 	public DefaultRequestHandler(AgentExecutor agentExecutor, TaskStore taskStore, QueueManager queueManager,
 			PushNotificationConfigStore pushConfigStore, PushNotificationSender pushSender,
-			RequestContextBuilder requestContextBuilder, Executor executor) {
+			RequestContextBuilder requestContextBuilder, ExecutorService executor) {
 		super();
 		this.agentExecutor = Objects.requireNonNull(agentExecutor, "An Agent Executor is required.");
 		this.taskStore = Objects.requireNonNull(taskStore, "A Task store is required.");
@@ -219,7 +220,8 @@ public class DefaultRequestHandler implements RequestHandler {
 				});
 				cleanupTask.setName("cleanup_producer:" + execution.taskId());
 				trackBackgroundTask(cleanupTask);
-			} else cleanupProducer(execution.taskId(), execution.producerTask());
+				executor.submit(cleanupTask);
+			} else cleanupProducer(execution.taskId(), execution.producerTask()).join();
 		}
 		
 		Kind result = eventInterrupt.result();
@@ -250,7 +252,17 @@ public class DefaultRequestHandler implements RequestHandler {
 		execution.producerTask().addDoneCallback(agentTask -> consumer.agentTaskCallback(agentTask));
 		
 		try {
-			Publisher<Event> results = execution.resultAggregator().consumeAndEmit(consumer);
+			Runnable cancellable = () -> {
+				FutureTaskWithDoneCallbacks<Void> backgroundTask = new FutureTaskWithDoneCallbacks<>(() -> {
+					execution.resultAggregator.consumeAll(consumer);
+					return null;
+				});
+				backgroundTask.setName("background_consume:" + execution.taskId());
+				trackBackgroundTask(backgroundTask);
+				executor.submit(backgroundTask);
+			};
+			
+			Publisher<Event> results = new CancellablePublisher(execution.resultAggregator().consumeAndEmit(consumer), cancellable);
 			results.subscribe(new ConsumingSubscriber(event -> {
 				if (event instanceof Task task) validateTaskIdMatch(execution.taskId(), task.getId());
 				
@@ -265,12 +277,13 @@ public class DefaultRequestHandler implements RequestHandler {
 			});
 			cleanupTask.setName("cleanup_producer:" + execution.taskId());
 			trackBackgroundTask(cleanupTask);
+			executor.submit(cleanupTask);
 		}
 	}
 	
 	private void validateTaskIdMatch(final String taskId, final String eventTaskId) {
 		if (!taskId.equals(eventTaskId)) {
-			LOGGER.severe(String.format("Agent generated task_id=%s does not match the RequestContext task_id=%s.", eventTaskId, taskId));
+			LOGGER.severe(String.format("Agent generated taskId=%s does not match the RequestContext taskId=%s.", eventTaskId, taskId));
 			throw new A2AServerError(new InternalError("Task ID mismatch in agent response"));
 		}
 	}
@@ -370,9 +383,9 @@ public class DefaultRequestHandler implements RequestHandler {
 	 * @param taskId
 	 * @param producerTask
 	 */
-	private void cleanupProducer(final String taskId, final FutureTask<Void> producerTask) {
+	private CompletableFuture<Void> cleanupProducer(final String taskId, final FutureTask<Void> producerTask) {
 		
-		CompletableFuture.runAsync(producerTask, executor).whenComplete((_, _) -> { 
+		return CompletableFuture.runAsync(producerTask, executor).whenComplete((_, _) -> { 
 			queueManager.close(taskId);
 			runningAgents.remove(taskId);
 		});

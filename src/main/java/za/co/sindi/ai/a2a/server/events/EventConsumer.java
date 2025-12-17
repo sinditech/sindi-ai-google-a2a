@@ -95,25 +95,26 @@ public class EventConsumer {
                         subscriber.onError(new IllegalArgumentException(
                             "Request must be positive, was: " + n));
                     }
+                    
+                    if (cancelled) return ;
+                    consumeAll(subscriber);
                 }
                 
                 @Override
                 public void cancel() {
                 	if (!cancelled) {
-                		LOGGER.fine("Subscription cancelled");
+                		LOGGER.fine("Subscription cancelled.");
                 		cancelled = true;
                 	}
                 }
             });
-            
-            consumeAll(subscriber);
 		};
 	}
 	
 	/**
 	 * Callback to handle exceptions from the agent's execution task.
      * <p>
-     * If the agent's CompletableFuture raises an exception, this callback is
+     * If the agent's task raises an exception, this callback is
      * invoked, and the exception is stored to be re-raised by the consumer loop.
      * 
 	 * @param agentTask the task that completed.
