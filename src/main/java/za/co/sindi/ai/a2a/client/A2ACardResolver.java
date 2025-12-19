@@ -97,6 +97,7 @@ public class A2ACardResolver {
 			return agentCard;
 		} catch (IOException | InterruptedException e) {
 			// TODO Auto-generated catch block
+			if (e instanceof InterruptedException) Thread.currentThread().interrupt();
 			throw new A2AClientHTTPError(503, "Network communication error fetching agent card from " + targetUrl + ":", e);
 		} catch (JsonbException e) {
 			// TODO Auto-generated catch block

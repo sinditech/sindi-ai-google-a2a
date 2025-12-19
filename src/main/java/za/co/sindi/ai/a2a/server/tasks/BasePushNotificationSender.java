@@ -70,6 +70,7 @@ public class BasePushNotificationSender implements PushNotificationSender {
 			}
 		} catch (InterruptedException | ExecutionException e) {
 			// TODO Auto-generated catch block
+			if (e instanceof InterruptedException) Thread.currentThread().interrupt();
 			LOGGER.log(Level.WARNING, String.format("Some push notifications failed to send for taskId=%s", task.getId()), e);
 		}
 	}
@@ -95,6 +96,7 @@ public class BasePushNotificationSender implements PushNotificationSender {
 			LOGGER.info(String.format("Push-notification sent for taskId=%s to URL: %s.", task.getId(), pushInfo.url()));
 		} catch (IOException | InterruptedException e) {
 			// TODO Auto-generated catch block
+			if (e instanceof InterruptedException) Thread.currentThread().interrupt();
 			LOGGER.severe(String.format("Error sending push-notification for taskId=%s to URL: %s.", task.getId(), pushInfo.url()));
 			return false;
 		}

@@ -89,11 +89,11 @@ public class ResultAggregator {
 	 * @param consumer The {@link EventConsumer} to read events from.
 	 * @return  The {@link Event} objects consumed from the {@link EventConsumer}.
 	 */
-	@SuppressWarnings({ "unchecked", "rawtypes" })
+	@SuppressWarnings({ })
 	public Publisher<Event> consumeAndEmit(final EventConsumer consumer) {
 		Publisher<Event> all = consumer.consumeAll();
-		return new TransformingPublisher(all, (event) -> {
-			return taskManager.process((Event) event);
+		return new TransformingPublisher<Event, Event>(all, (event) -> {
+			return taskManager.process(event);
 		});
 	}
 	
@@ -103,19 +103,21 @@ public class ResultAggregator {
 	 * @return The final {@link Task} object or {@link Message} object after the stream is exhausted.
             Returns <code>null</code> if the stream ends without producing a final result.
 	 */
-	@SuppressWarnings({ "rawtypes", "unchecked" })
+	@SuppressWarnings({ })
 	public Event consumeAll(final EventConsumer consumer) {
 		final AtomicReference<Event> returnEvent = new AtomicReference<>();
 		Publisher<Event> all = consumer.consumeAll();
-		all.subscribe(new ConsumingSubscriber(event -> {
+		all.subscribe(new ConsumingSubscriber<Event>((subscriber, event) -> {
 			if (event instanceof Message message) {
 				this.message = message;
 				if (returnEvent.get() == null) {
 					returnEvent.set((Event)event);
+					subscriber.onComplete();
+					return ;
 				}
-			} else {
-				taskManager.process((Event) event);
 			}
+				
+			taskManager.process(event);
 		}));
 		
 		if (returnEvent.get() != null) {
@@ -140,38 +142,39 @@ public class ResultAggregator {
      *          <li>A boolean indicating whether the consumption was interrupted, <code>true</code> or completed naturally, <code>false</code>.</li>
      *        </ul>
 	 */
-	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public EventInterrupt consumeAndBreakOnInterrupt(final EventConsumer consumer, boolean blocking, Runnable eventCallback) {
 		Publisher<Event> all = consumer.consumeAll();
 		final AtomicBoolean interrupted = new AtomicBoolean(false);
 		final AtomicReference<EventInterrupt> returnEventInterrupt = new AtomicReference<>();
 		
-		all.subscribe(new ConsumingSubscriber(event -> {
+		all.subscribe(new ConsumingSubscriber<Event>((subscriber, event) -> {
 			if (event instanceof Message message) {
 				this.message = message;
 				if (returnEventInterrupt.get() == null) {
 					returnEventInterrupt.set(new EventInterrupt(message, false));
+					subscriber.onComplete();
+					return ;
 				}
-			} else if (!interrupted.get()){
-				taskManager.process((Event) event);
+			}
 			
-				boolean shouldInterrupt = false;
-				boolean isAuthRequired = (event instanceof Task task && task.getStatus().state() == TaskState.AUTH_REQUIRED)
-                        || (event instanceof TaskStatusUpdateEvent tsue && tsue.getStatus().state() == TaskState.AUTH_REQUIRED);
-				
-				if (isAuthRequired) {
-					LOGGER.fine("Encountered an auth-required task: breaking synchronous message/send flow.");
-					shouldInterrupt = true;
-				} else if (!blocking) {
-					LOGGER.fine("Non-blocking call: returning task after first event.");
-					shouldInterrupt = true;
-				}
-				
-				if (shouldInterrupt) {
-					// Continue consuming the rest of the events in the background.
-					CompletableFuture.runAsync(() -> continueConsuming(all, eventCallback));
-					interrupted.set(true);
-				}
+			taskManager.process((Event) event);
+			
+			boolean shouldInterrupt = false;
+			boolean isAuthRequired = (event instanceof Task task && task.getStatus().state() == TaskState.AUTH_REQUIRED)
+                    || (event instanceof TaskStatusUpdateEvent tsue && tsue.getStatus().state() == TaskState.AUTH_REQUIRED);
+			
+			if (isAuthRequired) {
+				LOGGER.fine("Encountered an auth-required task: breaking synchronous message/send flow.");
+				shouldInterrupt = true;
+			} else if (!blocking) {
+				LOGGER.fine("Non-blocking call: returning task after first event.");
+				shouldInterrupt = true;
+			}
+			
+			if (shouldInterrupt) {
+				// Continue consuming the rest of the events in the background.
+				CompletableFuture.runAsync(() -> continueConsuming(all, eventCallback));
+				interrupted.set(true);
 			}
 		}));
 		
@@ -188,10 +191,9 @@ public class ResultAggregator {
 	 * @param eventPublisher The remaining producer of events from the consumer.
 	 * @param eventCallback Optional async callback function to be called after each event is processed.
 	 */
-	@SuppressWarnings({ "unchecked", "rawtypes" })
 	private void continueConsuming(final Publisher<Event> eventPublisher, final Runnable eventCallback) {
-		eventPublisher.subscribe(new ConsumingSubscriber(event -> {
-			taskManager.process((Event)event);
+		eventPublisher.subscribe(new ConsumingSubscriber<Event>((_, event) -> {
+			taskManager.process(event);
 			if (eventCallback != null) eventCallback.run();
 		}));
 	}

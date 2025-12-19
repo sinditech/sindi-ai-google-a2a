@@ -65,6 +65,7 @@ public class EventConsumer {
 			return event;
 		} catch (InterruptedException | QueueClosedException | QueueEmptyException e) {
 			// TODO Auto-generated catch block
+			if (e instanceof InterruptedException) Thread.currentThread().interrupt();
 			if (e instanceof QueueClosedException) {
 				LOGGER.warning("Event queue is closed in consumeOne().");
 			} else if (e instanceof QueueEmptyException) {
@@ -168,6 +169,7 @@ public class EventConsumer {
                     break;
                 }
             } catch (IllegalStateException | InterruptedException e) {
+            	if (e instanceof InterruptedException) Thread.currentThread().interrupt();
             	continue;
             } catch (QueueClosedException | QueueEmptyException e) {
                 if (queue.isClosed() || queue.isEmpty()) {

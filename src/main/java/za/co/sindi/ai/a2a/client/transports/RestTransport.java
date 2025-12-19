@@ -11,12 +11,15 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
+import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Flow.Publisher;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -30,7 +33,6 @@ import za.co.sindi.ai.a2a.client.middleware.ClientCallInterceptor;
 import za.co.sindi.ai.a2a.client.middleware.ClientCallInterceptor.RequestPayloadAndKeywordArguments;
 import za.co.sindi.ai.a2a.extensions.A2AExtensions;
 import za.co.sindi.ai.a2a.types.AgentCard;
-import za.co.sindi.ai.a2a.types.GetAuthenticatedExtendedCardSuccessResponse;
 import za.co.sindi.ai.a2a.types.GetTaskPushNotificationConfigParams;
 import za.co.sindi.ai.a2a.types.JSONRPCErrorResponse;
 import za.co.sindi.ai.a2a.types.Kind;
@@ -50,6 +52,7 @@ import za.co.sindi.commons.net.http.WithErrorBodyHandler;
 import za.co.sindi.commons.net.sse.Event;
 import za.co.sindi.commons.net.sse.EventHandler;
 import za.co.sindi.commons.net.sse.MessageEvent;
+import za.co.sindi.commons.net.sse.SSEEventLineSubscriber;
 import za.co.sindi.commons.net.sse.SSEEventSubscriber;
 import za.co.sindi.commons.util.Either;
 import za.co.sindi.commons.utils.Preconditions;
@@ -119,6 +122,7 @@ public class RestTransport implements ClientTransport {
 		// TODO Auto-generated method stub
 		Preconditions.checkArgument(request != null, "A MessageSendParams request is required.");
 		Map<String, Object> modifiedKeywordArguments = A2AExtensions.updateExtensionHeader(getHttpArguments(context), extensions != null && !extensions.isEmpty() ? extensions : this.extensions);
+		modifiedKeywordArguments.computeIfAbsent("headers", _ -> new ConcurrentHashMap<>(Map.of("Accept", "text/event-stream")));
 		RequestPayloadAndKeywordArguments requestPayloadAndKeywordArguments = applyInterceptors(request, modifiedKeywordArguments, context);
 		sendPostRequest("/v1/message:stream", request, requestPayloadAndKeywordArguments.keywordArguments(), eventDataConsumer, eventErrorConsumer, StreamResponse.class);
 	}
@@ -315,14 +319,17 @@ public class RestTransport implements ClientTransport {
 						if (result.artifactUpdate() != null) return (T) result.artifactUpdate();
 						if (result.statusUpdate() != null) return (T) result.statusUpdate();
 					};
+					
+					if (errorConsumer != null) errorConsumer.accept(new IllegalStateException("Unable to find a Streaming kind from response."));
 				}
 				
-				if (errorConsumer != null) errorConsumer.accept(new IllegalStateException("Unable to find a Streaming kind from response."));
 				return null;
 			};
 			
 			EventHandler sseEventHandler = new ConsumingEventHandler<T>(mapper, dataConsumer, errorConsumer);
-			HttpResponse<Either<Void, String>> response = httpClient.send(createHttpPOSTRequest(agentUrl + targetUrl, requestPayload, httpKeywordArguments), new WithErrorBodyHandler<>(BodyHandlers.fromLineSubscriber(new SSEEventSubscriber(sseEventHandler))));
+			HttpResponse<Either<Publisher<List<ByteBuffer>>, String>> response = httpClient.send(createHttpPOSTRequest(agentUrl + targetUrl, requestPayload, httpKeywordArguments), new WithErrorBodyHandler<>(BodyHandlers.ofPublisher()));
+			var body = response.body();
+			if (body.isLeftPresent()) body.getLeft().subscribe(new SSEEventLineSubscriber(sseEventHandler));
 			raiseExceptionsIfAny(response);
 		} catch (IOException e) {
 			// TODO Auto-generated catch block

@@ -19,6 +19,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Flow.Publisher;
 import java.util.concurrent.FutureTask;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.logging.Logger;
 
 import za.co.sindi.ai.a2a.server.A2AServerError;
@@ -56,7 +57,7 @@ import za.co.sindi.ai.a2a.types.TaskState;
 import za.co.sindi.ai.a2a.types.UnsupportedOperationError;
 import za.co.sindi.ai.a2a.utils.Tasks;
 import za.co.sindi.commons.concurrent.CancellablePublisher;
-import za.co.sindi.commons.concurrent.ConsumingSubscriber;
+import za.co.sindi.commons.concurrent.TransformingPublisher;
 
 /**
  * Default request handler for all incoming requests.<p />
@@ -204,7 +205,7 @@ public class DefaultRequestHandler implements RequestHandler {
 		EventConsumer consumer = new EventConsumer(execution.queue());
 		execution.producerTask().addDoneCallback(agentTask -> consumer.agentTaskCallback(agentTask));
 		
-		boolean blocking = false;
+		boolean blocking = true;
 		if (params.configuration() != null && params.configuration().blocking() != null && Boolean.FALSE.equals(params.configuration().blocking())) blocking = false;
 		
 		EventInterrupt eventInterrupt = null;
@@ -213,10 +214,9 @@ public class DefaultRequestHandler implements RequestHandler {
 			eventInterrupt = execution.resultAggregator().consumeAndBreakOnInterrupt(consumer, blocking, pushNotificationCallback);
 			
 		} finally {
-			if (eventInterrupt.interrupted())  {
+			if (eventInterrupt != null && eventInterrupt.interrupted())  {
 				FutureTaskWithDoneCallbacks<Void> cleanupTask = new FutureTaskWithDoneCallbacks<>(() -> {
-					cleanupProducer(execution.taskId(), execution.producerTask());
-					return null;
+					return cleanupProducer(execution.taskId(), execution.producerTask()).join();
 				});
 				cleanupTask.setName("cleanup_producer:" + execution.taskId());
 				trackBackgroundTask(cleanupTask);
@@ -224,7 +224,7 @@ public class DefaultRequestHandler implements RequestHandler {
 			} else cleanupProducer(execution.taskId(), execution.producerTask()).join();
 		}
 		
-		Kind result = eventInterrupt.result();
+		Kind result = eventInterrupt == null ? null : eventInterrupt.result();
 		if (result == null) {
 			throw new A2AServerError(new InternalError());
 		}
@@ -243,7 +243,6 @@ public class DefaultRequestHandler implements RequestHandler {
 	/**
 	 * Default handler for 'message/stream' (streaming).
 	 */
-	@SuppressWarnings({ "rawtypes", "unchecked" })
 	@Override
 	public Publisher<Event> onMessageSendStream(MessageSendParams params, ServerCallContext context) {
 		// TODO Auto-generated method stub
@@ -252,7 +251,7 @@ public class DefaultRequestHandler implements RequestHandler {
 		execution.producerTask().addDoneCallback(agentTask -> consumer.agentTaskCallback(agentTask));
 		
 		try {
-			Runnable cancellable = () -> {
+			Runnable cancel = () -> {
 				FutureTaskWithDoneCallbacks<Void> backgroundTask = new FutureTaskWithDoneCallbacks<>(() -> {
 					execution.resultAggregator.consumeAll(consumer);
 					return null;
@@ -262,18 +261,21 @@ public class DefaultRequestHandler implements RequestHandler {
 				executor.submit(backgroundTask);
 			};
 			
-			Publisher<Event> results = new CancellablePublisher(execution.resultAggregator().consumeAndEmit(consumer), cancellable);
-			results.subscribe(new ConsumingSubscriber(event -> {
+			Function<Event, Event> accept = (event) -> {
 				if (event instanceof Task task) validateTaskIdMatch(execution.taskId(), task.getId());
-				
+
 				sendPushNotificationIfNeeded(execution.taskId(), execution.resultAggregator());
-			}));
+				
+				return event;
+			};
 			
+			Publisher<Event> results = execution.resultAggregator().consumeAndEmit(consumer);
+			results = new TransformingPublisher<Event, Event>(results, accept);
+			results = new CancellablePublisher<Event>(results, cancel);
 			return results;
 		} finally {
 			FutureTaskWithDoneCallbacks<Void> cleanupTask = new FutureTaskWithDoneCallbacks<>(() -> {
-				cleanupProducer(execution.taskId(), execution.producerTask());
-				return null;
+				return cleanupProducer(execution.taskId(), execution.producerTask()).join();
 			});
 			cleanupTask.setName("cleanup_producer:" + execution.taskId());
 			trackBackgroundTask(cleanupTask);

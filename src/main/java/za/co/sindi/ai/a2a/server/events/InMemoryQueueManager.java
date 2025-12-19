@@ -55,6 +55,7 @@ public class InMemoryQueueManager implements QueueManager {
 			queue.close();
 		} catch (InterruptedException e) {
 			// TODO Auto-generated catch block
+			Thread.currentThread().interrupt();
 			throw new UncheckedException(e);
 		}
 	}

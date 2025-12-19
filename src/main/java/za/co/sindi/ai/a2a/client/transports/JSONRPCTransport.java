@@ -10,6 +10,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
+import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -17,6 +18,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Flow.Publisher;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -62,6 +65,7 @@ import za.co.sindi.commons.net.http.WithErrorBodyHandler;
 import za.co.sindi.commons.net.sse.Event;
 import za.co.sindi.commons.net.sse.EventHandler;
 import za.co.sindi.commons.net.sse.MessageEvent;
+import za.co.sindi.commons.net.sse.SSEEventLineSubscriber;
 import za.co.sindi.commons.net.sse.SSEEventSubscriber;
 import za.co.sindi.commons.util.Either;
 import za.co.sindi.commons.utils.Preconditions;
@@ -150,6 +154,7 @@ public class JsonRpcTransport implements ClientTransport {
 		Preconditions.checkArgument(request != null, "A MessageSendParams request is required.");
 		SendStreamingMessageRequest sendStreamingMessageRequest = new SendStreamingMessageRequest(RequestId.of(UUID.randomUUID().toString()), request);
 		Map<String, Object> modifiedKeywordArguments = A2AExtensions.updateExtensionHeader(getHttpArguments(context), extensions != null && !extensions.isEmpty() ? extensions : this.extensions);
+		modifiedKeywordArguments.computeIfAbsent("headers", _ -> new ConcurrentHashMap<>(Map.of("Accept", "text/event-stream")));
 		RequestPayloadAndKeywordArguments requestPayloadAndKeywordArguments = applyInterceptors(sendStreamingMessageRequest.getRequestMethod(), sendStreamingMessageRequest, modifiedKeywordArguments, context);
 		sendRequest(sendStreamingMessageRequest, requestPayloadAndKeywordArguments.keywordArguments(), eventDataConsumer, eventErrorConsumer, SendStreamingMessageSuccessResponse.class);
 	}
@@ -280,7 +285,9 @@ public class JsonRpcTransport implements ClientTransport {
 			};
 			
 			EventHandler sseEventHandler = new ConsumingEventHandler<T>(mapper, dataConsumer, errorConsumer);
-			HttpResponse<Either<Void, String>> response = httpClient.send(createHttpPOSTRequest(requestPayload, httpKeywordArguments), new WithErrorBodyHandler<>(BodyHandlers.fromLineSubscriber(new SSEEventSubscriber(sseEventHandler))));
+			HttpResponse<Either<Publisher<List<ByteBuffer>>, String>> response = httpClient.send(createHttpPOSTRequest(requestPayload, httpKeywordArguments), new WithErrorBodyHandler<>(BodyHandlers.ofPublisher()));
+			var body = response.body();
+			if (body.isLeftPresent()) body.getLeft().subscribe(new SSEEventLineSubscriber(sseEventHandler));
 			raiseExceptionsIfAny(response);
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
