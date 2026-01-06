@@ -17,7 +17,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import za.co.sindi.ai.a2a.client.A2AClientJSONRPCError;
 import za.co.sindi.ai.a2a.types.JSONRPCErrorResponse;
 import za.co.sindi.ai.a2a.types.PushNotificationConfig;
 import za.co.sindi.ai.a2a.types.Task;
@@ -110,7 +109,9 @@ public class BasePushNotificationSender implements PushNotificationSender {
 			String content = httpResponse.body();
 			String contentType = httpResponse.headers().firstValue("Content-Type").orElse(null);
 			if (!Strings.isNullOrEmpty(contentType) && contentType.startsWith("application/json")) {
-				throw new A2AClientJSONRPCError(JsonUtils.unmarshall(content, JSONRPCErrorResponse.class));
+//				throw new A2AClientJSONRPCError(JsonUtils.unmarshall(content, JSONRPCErrorResponse.class));
+				JSONRPCErrorResponse response = JsonUtils.unmarshall(content, JSONRPCErrorResponse.class);
+				throw new IOException("HTTP status " + httpResponse.statusCode() + ": " + response.getError().getMessage());
 			} else throw new IOException("HTTP status " + httpResponse.statusCode() + ": " + content);
 		}
 	}

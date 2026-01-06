@@ -410,9 +410,9 @@ public class DefaultRequestHandler implements RequestHandler {
 			} catch (Throwable throwable) {
 				String name = ((FutureTaskWithDoneCallbacks<?>)_task).getName();
 				if (throwable instanceof CancellationException || _task.isCancelled()) {
-					LOGGER.fine(String.format("Background task %s cancelled", name));
+					LOGGER.fine(String.format("Background task %s cancelled.", name));
 				} else {
-					LOGGER.severe(String.format("Background task %s failed", name));
+					LOGGER.severe(String.format("Background task %s failed.", name));
 				}
 			} finally {
 				backgroundTasks.remove(_task);

@@ -39,7 +39,7 @@ public final class JSONRPCErrorResponse extends JSONRPCResponse {
 		private Object data;
 		
 		@JsonbCreator
-		public JSONRPCError(@JsonbProperty int code, @JsonbProperty String message, @JsonbProperty Object data) {
+		public JSONRPCError(@JsonbProperty("code") int code, @JsonbProperty("message") String message, @JsonbProperty("data") Object data) {
 			this(code, message);
 			this.data = data;
 		}
